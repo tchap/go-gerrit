@@ -8,7 +8,6 @@ package gerrit
 import (
 	"os/user"
 	"path/filepath"
-	"strconv"
 
 	"code.google.com/p/go.crypto/ssh"
 )
@@ -46,11 +45,6 @@ func Dial(opts *DialOptions) (*Session, error) {
 		opts = &DialOptions{}
 	}
 
-	usr, err := user.Current()
-	if err != nil {
-		return nil, err
-	}
-
 	if opts.Host == "" {
 		opts.Host = DefaultHost
 	}
@@ -58,23 +52,22 @@ func Dial(opts *DialOptions) (*Session, error) {
 		opts.Port = DefaultPort
 	}
 	if opts.User == "" {
+		usr, err := user.Current()
+		if err != nil {
+			return nil, err
+		}
 		opts.User = usr.Username
 	}
 	if opts.IdentityFile == "" {
+		usr, err := user.Current()
+		if err != nil {
+			return nil, err
+		}
 		opts.IdentityFile = filepath.Join(usr.HomeDir, ".ssh", "id_rsa")
 	}
 
 	// Connect to Gerrit using given configuration.
-	auth, err := newKeyring(opts.IdentityFile)
-	if err != nil {
-		return nil, err
-	}
-
-	port := strconv.FormatUint(uint64(opts.Port), 10)
-	conn, err := ssh.Dial("tcp", opts.Host+":"+port, &ssh.ClientConfig{
-		User: opts.User,
-		Auth: []ssh.ClientAuth{auth},
-	})
+	conn, err := dialSSH(opts.Host, opts.Port, opts.User, opts.IdentityFile)
 	if err != nil {
 		return nil, err
 	}

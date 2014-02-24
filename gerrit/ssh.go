@@ -15,9 +15,24 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"code.google.com/p/go.crypto/ssh"
 )
+
+// dialSSH establishes an SSH connection using the given username and identity file.
+func dialSSH(host string, port uint16, user string, identityFile string) (*ssh.ClientConn, error) {
+	auth, err := newKeyring(identityFile)
+	if err != nil {
+		return nil, err
+	}
+
+	portString := strconv.FormatUint(uint64(port), 10)
+	return ssh.Dial("tcp", host+":"+portString, &ssh.ClientConfig{
+		User: user,
+		Auth: []ssh.ClientAuth{auth},
+	})
+}
 
 // keyring implements ssh.ClientKeyring
 type keyring struct {
