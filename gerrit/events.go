@@ -18,6 +18,21 @@ type EventStream struct {
 	TopicChanged    <-chan *TopicChangedEvent
 }
 
+func newEventStream() *EventStream {
+	return &EventStream{
+		make(chan *PatchsetCreatedEvent),
+		make(chan *DraftPublishedEvent),
+		make(chan *ChangeAbandonedEvent),
+		make(chan *ChangeRestoredEvent),
+		make(chan *ChangeMergedEvent),
+		make(chan *MergeFailedEvent),
+		make(chan *CommentAddedEvent),
+		make(chan *RefUpdatedEvent),
+		make(chan *ReviewerAddedEvent),
+		make(chan *TopicChangedEvent),
+	}
+}
+
 type PatchsetCreatedEvent struct {
 	Type     string
 	Change   *Change
