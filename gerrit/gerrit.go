@@ -83,3 +83,7 @@ func (session *Session) NewEventStream() (*EventStream, error) {
 
 	return newEventStream(s)
 }
+
+func (session *Session) Close() error {
+	return session.conn.Close()
+}

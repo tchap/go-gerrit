@@ -24,15 +24,17 @@ func main() {
 		log.Fatal(err)
 	}
 
-	signalCh := make(os.Signal, 1)
+	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, os.Interrupt)
 
 	defer func() {
 		if err := stream.Close(); err != nil {
 			log.Print(err)
 		}
+		if err := session.Close(); err != nil {
+			log.Print(err)
+		}
 	}()
-	defer session.Close()
 
 	for {
 		select {
