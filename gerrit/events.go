@@ -5,31 +5,170 @@
 
 package gerrit
 
+import (
+	"bufio"
+	"encoding/json"
+	"fmt"
+	"io"
+
+	"code.google.com/p/go.crypto/ssh"
+)
+
+const (
+	EventPatchsetCreated = "patchset-created"
+	EventDraftPublished  = "draft-published"
+	EventChangeAbandoned = "change-abandoned"
+	EventChangeRestored  = "change-restored"
+	EventChangeMerged    = "change-merged"
+	EventMergeFailed     = "merge-failed"
+	EventCommentAdded    = "comment-added"
+	EventRefUpdated      = "ref-updated"
+	EventReviewerAdded   = "reviewer-added"
+	EventTopicChanged    = "topic-changed"
+)
+
 type EventStream struct {
-	PatchsetCreated <-chan *PatchsetCreatedEvent
-	DraftPublished  <-chan *DraftPublishedEvent
-	ChangeAbandoned <-chan *ChangeAbandonedEvent
-	ChangeRestored  <-chan *ChangeRestoredEvent
-	ChangeMerged    <-chan *ChangeMergedEvent
-	MergeFailed     <-chan *MergeFailedEvent
-	CommentAdded    <-chan *CommentAddedEvent
-	RefUpdated      <-chan *RefUpdatedEvent
-	ReviewerAdded   <-chan *ReviewerAddedEvent
-	TopicChanged    <-chan *TopicChangedEvent
+	session  *ssh.Session
+	eventCh  chan interface{}
+	closedCh chan struct{}
+	err      error
 }
 
-func newEventStream() *EventStream {
-	return &EventStream{
-		make(chan *PatchsetCreatedEvent),
-		make(chan *DraftPublishedEvent),
-		make(chan *ChangeAbandonedEvent),
-		make(chan *ChangeRestoredEvent),
-		make(chan *ChangeMergedEvent),
-		make(chan *MergeFailedEvent),
-		make(chan *CommentAddedEvent),
-		make(chan *RefUpdatedEvent),
-		make(chan *ReviewerAddedEvent),
-		make(chan *TopicChangedEvent),
+func newEventStream(session *ssh.Session) (*EventStream, error) {
+	pipe, err := session.StdoutPipe()
+	if err != nil {
+		session.Close()
+		return nil, err
+	}
+
+	if err := session.Start("gerrit stream-events"); err != nil {
+		session.Close()
+		return nil, err
+	}
+
+	stream := &EventStream{
+		session:  session,
+		eventCh:  make(chan interface{}),
+		closedCh: make(chan struct{}),
+	}
+
+	go stream.readEvents(pipe)
+	return stream, nil
+}
+
+func (stream *EventStream) readEvents(pipe io.Reader) {
+	reader := bufio.NewReader(pipe)
+	for {
+		line, err := reader.ReadBytes('\n')
+		if err != nil {
+			if err == io.EOF {
+				return
+			}
+			stream.err = err
+			close(stream.eventCh)
+			close(stream.closedCh)
+			return
+		}
+
+		stream.eventCh <- parseEvent(line)
+	}
+}
+
+func (stream *EventStream) Chan() <-chan interface{} {
+	return stream.eventCh
+}
+
+func (stream *EventStream) Close() error {
+	if err := stream.session.Close(); err != nil {
+		return err
+	}
+	<-stream.closedCh
+	return stream.err
+}
+
+type event struct {
+	Type string
+}
+
+func parseEvent(line []byte) interface{} {
+	var evt event
+	if err := json.Unmarshal(line, &evt); err != nil {
+		return err
+	}
+
+	switch evt.Type {
+	case EventPatchsetCreated:
+		var event PatchsetCreatedEvent
+		if err := json.Unmarshal(line, &event); err != nil {
+			return err
+		}
+		return &event
+
+	case EventDraftPublished:
+		var event DraftPublishedEvent
+		if err := json.Unmarshal(line, &event); err != nil {
+			return err
+		}
+		return &event
+
+	case EventChangeAbandoned:
+		var event ChangeAbandonedEvent
+		if err := json.Unmarshal(line, &event); err != nil {
+			return err
+		}
+		return &event
+
+	case EventChangeRestored:
+		var event ChangeRestoredEvent
+		if err := json.Unmarshal(line, &event); err != nil {
+			return err
+		}
+		return &event
+
+	case EventChangeMerged:
+		var event ChangeMergedEvent
+		if err := json.Unmarshal(line, &event); err != nil {
+			return err
+		}
+		return &event
+
+	case EventMergeFailed:
+		var event MergeFailedEvent
+		if err := json.Unmarshal(line, &event); err != nil {
+			return err
+		}
+		return &event
+
+	case EventCommentAdded:
+		var event PatchsetCreatedEvent
+		if err := json.Unmarshal(line, &event); err != nil {
+			return err
+		}
+		return &event
+
+	case EventRefUpdated:
+		var event RefUpdatedEvent
+		if err := json.Unmarshal(line, &event); err != nil {
+			return err
+		}
+		return &event
+
+	case EventReviewerAdded:
+		var event ReviewerAddedEvent
+		if err := json.Unmarshal(line, &event); err != nil {
+			return err
+		}
+		return &event
+
+	case EventTopicChanged:
+		var event TopicChangedEvent
+		if err := json.Unmarshal(line, &event); err != nil {
+			return err
+		}
+		return &event
+
+	default:
+		return fmt.Errorf("unknown event received: %s", evt.Type)
 	}
 }
 

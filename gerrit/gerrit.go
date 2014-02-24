@@ -74,3 +74,12 @@ func Dial(opts *DialOptions) (*Session, error) {
 
 	return &Session{conn}, nil
 }
+
+func (session *Session) NewEventStream() (*EventStream, error) {
+	s, err := session.conn.NewSession()
+	if err != nil {
+		return nil, err
+	}
+
+	return newEventStream(s)
+}
