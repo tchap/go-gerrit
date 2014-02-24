@@ -27,14 +27,22 @@ func main() {
 	signalCh := make(os.Signal, 1)
 	signal.Notify(signalCh, os.Interrupt)
 
+	defer func() {
+		if err := stream.Close(); err != nil {
+			log.Print(err)
+		}
+	}()
+	defer session.Close()
+
 	for {
 		select {
-		case event := <-stream.Chan():
+		case event, ok := <-stream.Chan():
+			if !ok {
+				return
+			}
 			fmt.Printf("%#v\n", event)
 
 		case <-signalCh:
-			stream.Close()
-			session.Close()
 			return
 		}
 	}
