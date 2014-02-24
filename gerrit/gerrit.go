@@ -65,18 +65,16 @@ func Dial(opts *DialOptions) (*Session, error) {
 	}
 
 	// Connect to Gerrit using given configuration.
-	clientKeyring, err := newKeyring(opts.IdentityFile)
+	auth, err := newKeyring(opts.IdentityFile)
 	if err != nil {
 		return nil, err
 	}
 
-	clientConfig := &ssh.ClientConfig{
-		User: opts.User,
-		Auth: []ssh.ClientAuth{clientKeyring},
-	}
-
 	port := strconv.FormatUint(uint64(opts.Port), 10)
-	conn, err := ssh.Dial("tcp", opts.Host+":"+port, clientConfig)
+	conn, err := ssh.Dial("tcp", opts.Host+":"+port, &ssh.ClientConfig{
+		User: opts.User,
+		Auth: []ssh.ClientAuth{auth},
+	})
 	if err != nil {
 		return nil, err
 	}
