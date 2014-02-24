@@ -29,7 +29,7 @@ func main() {
 
 	for {
 		select {
-		case event := <-stream.Chan:
+		case event := <-stream.Chan():
 			fmt.Printf("%#v\n", event)
 
 		case <-signalCh:
